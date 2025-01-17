@@ -1,4 +1,4 @@
-package main
+package traefik_ha_auth_middleware
 
 import (
 	"bytes"
