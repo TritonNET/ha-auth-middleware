@@ -15,19 +15,25 @@ import (
 // Config holds the plugin configuration.
 type Config struct {
 	VerificationEndpoint string `json:"verificationEndpoint"`
+	SourcePath           string `json:"sourcePath"`
+	DestinationPath      string `json:"destinationPath"`
 }
 
 // CreateConfig initializes the Config with default values.
 func CreateConfig() *Config {
 	return &Config{
 		VerificationEndpoint: "",
+		SourcePath:           "",
+		DestinationPath:      "",
 	}
 }
 
-// BearerTokenMiddleware is a middleware for verifying Bearer tokens and injecting email.
+// BearerTokenMiddleware is a middleware for verifying tokens and injecting email.
 type BearerTokenMiddleware struct {
 	next                 http.Handler
 	verificationEndpoint string
+	sourcePath           string
+	destinationPath      string
 	name                 string
 }
 
@@ -40,21 +46,23 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return &BearerTokenMiddleware{
 		next:                 next,
 		verificationEndpoint: config.VerificationEndpoint,
+		sourcePath:           config.SourcePath,
+		destinationPath:      config.DestinationPath,
 		name:                 name,
 	}, nil
 }
 
 // ServeHTTP processes the HTTP request.
 func (b *BearerTokenMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	authHeader := req.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		http.Error(rw, "missing or invalid Authorization header", http.StatusUnauthorized)
+	// Extract the token from the "auth_token" cookie.
+	cookie, err := req.Cookie("auth_token")
+	if err != nil {
+		http.Error(rw, "missing or invalid auth_token cookie", http.StatusUnauthorized)
 		return
 	}
-
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-
-	email, err := b.verifyTokenAndGetEmail(token)
+	
+	// Verify the token and get the email.
+	email, err := b.verifyTokenAndGetEmail(cookie.Value)
 	if err != nil {
 		http.Error(rw, "unauthorized: "+err.Error(), http.StatusUnauthorized)
 		return
@@ -62,6 +70,11 @@ func (b *BearerTokenMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Requ
 
 	// Inject the email as a header into the request.
 	req.Header.Set("X-Authentik-Email", email)
+
+	// Replace the request path if it matches the source path.
+	if strings.HasPrefix(req.URL.Path, b.sourcePath) {
+		req.URL.Path = strings.Replace(req.URL.Path, b.sourcePath, b.destinationPath, 1)
+	}
 
 	// Pass the request to the next handler.
 	b.next.ServeHTTP(rw, req)
