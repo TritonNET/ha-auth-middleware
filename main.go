@@ -1,16 +1,11 @@
 package traefik_ha_auth_middleware
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strings"
-
-	"github.com/traefik/traefik/v2/pkg/plugins"
 )
 
 // Config holds the plugin configuration.
@@ -18,7 +13,7 @@ type Config struct {
 	VerificationEndpoint string `json:"verificationEndpoint"`
 	SourcePath           string `json:"sourcePath"`
 	DestinationPath      string `json:"destinationPath"`
-	EmailAddress	     string `json:"emailAddress"`
+	EmailAddress         string `json:"emailAddress"`
 }
 
 // CreateConfig initializes the Config with default values.
@@ -37,12 +32,19 @@ type BearerTokenMiddleware struct {
 	verificationEndpoint string
 	sourcePath           string
 	destinationPath      string
-	emailAddress	     string
+	emailAddress         string
 	name                 string
 }
 
 // New creates a new BearerTokenMiddleware instance.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	if config.EmailAddress == "" {
+		return nil, fmt.Errorf("emailAddress is required")
+	}
+	if config.SourcePath == "" || config.DestinationPath == "" {
+		return nil, fmt.Errorf("sourcePath and destinationPath are required")
+	}
+
 	return &BearerTokenMiddleware{
 		next:                 next,
 		verificationEndpoint: config.VerificationEndpoint,
