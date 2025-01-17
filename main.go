@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
 // Config holds the plugin configuration.
 type Config struct {
 	VerificationEndpoint string `json:"verificationEndpoint"`
-	SourcePath           string `json:"sourcePath"`
-	DestinationPath      string `json:"destinationPath"`
+	SourceHost           string `json:"sourceHost"`
+	DestinationHost      string `json:"destinationHost"`
 	EmailAddress         string `json:"emailAddress"`
 }
 
@@ -20,8 +21,8 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		VerificationEndpoint: "",
-		SourcePath:           "",
-		DestinationPath:      "",
+		SourceHost:           "",
+		DestinationHost:      "",
 		EmailAddress:         "",
 	}
 }
@@ -30,8 +31,8 @@ func CreateConfig() *Config {
 type BearerTokenMiddleware struct {
 	next                 http.Handler
 	verificationEndpoint string
-	sourcePath           string
-	destinationPath      string
+	sourceHost           string
+	destinationHost      string
 	emailAddress         string
 	name                 string
 }
@@ -41,15 +42,15 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	if config.EmailAddress == "" {
 		return nil, fmt.Errorf("emailAddress is required")
 	}
-	if config.SourcePath == "" || config.DestinationPath == "" {
-		return nil, fmt.Errorf("sourcePath and destinationPath are required")
+	if config.SourceHost == "" || config.DestinationHost == "" {
+		return nil, fmt.Errorf("sourceHost and destinationHost are required.")
 	}
 
 	return &BearerTokenMiddleware{
 		next:                 next,
 		verificationEndpoint: config.VerificationEndpoint,
-		sourcePath:           config.SourcePath,
-		destinationPath:      config.DestinationPath,
+		sourceHost:           config.SourceHost,
+		destinationHost:      config.DestinationHost,
 		emailAddress:         config.EmailAddress,
 		name:                 name,
 	}, nil
@@ -57,18 +58,36 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 
 // ServeHTTP processes the HTTP request.
 func (b *BearerTokenMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	log.Printf("HA_AUTH_MIDDLEWARE: Processing request for path: %s", req.URL.Path)
+
 	// Log all cookies in the request.
 	for _, cookie := range req.Cookies() {
-		log.Printf("Cookie: %s = %s", cookie.Name, cookie.Value)
+		log.Printf("HA_AUTH_MIDDLEWARE: Cookie: %s = %s", cookie.Name, cookie.Value)
 	}
 
+	// Add the X-authentik-email header.
 	req.Header.Set("X-authentik-email", b.emailAddress)
-
-	// Replace the request path if it matches the source path.
-	if strings.HasPrefix(req.URL.Path, b.sourcePath) {
-		req.URL.Path = strings.Replace(req.URL.Path, b.sourcePath, b.destinationPath, 1)
+	
+	sourceURL, err := url.Parse(b.sourceHost)
+	if err != nil || sourceURL.Host == "" {
+		http.Error(rw, "Internal Server Error: Invalid sourceHost", http.StatusInternalServerError)
+		return
+	}
+	destinationURL, err := url.Parse(b.destinationHost)
+	if err != nil || destinationURL.Host == "" {
+		http.Error(rw, "Internal Server Error: Invalid destinationHost", http.StatusInternalServerError)
+		return
 	}
 
-	// Pass the request to the next handler.
+	// Replace the Host header if it matches the source host.
+	if req.Host == sourceURL.Host {
+		previousHost := req.Host
+		req.Host = destinationURL.Host
+		log.Printf("HA_AUTH_MIDDLEWARE: Host header updated: previous value: %s, new value: %s", previousHost, req.Host)
+	} else {
+		log.Printf("HA_AUTH_MIDDLEWARE: Host header not updated: %s, source host: %s", req.Host, sourceURL.Host)
+	} 
+	
 	b.next.ServeHTTP(rw, req)
 }
+
