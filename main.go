@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,7 @@ type Config struct {
 	VerificationEndpoint string `json:"verificationEndpoint"`
 	SourcePath           string `json:"sourcePath"`
 	DestinationPath      string `json:"destinationPath"`
+	EmailAddress	     string `json:"emailAddress"`
 }
 
 // CreateConfig initializes the Config with default values.
@@ -25,6 +27,7 @@ func CreateConfig() *Config {
 		VerificationEndpoint: "",
 		SourcePath:           "",
 		DestinationPath:      "",
+		EmailAddress:         "",
 	}
 }
 
@@ -34,42 +37,30 @@ type BearerTokenMiddleware struct {
 	verificationEndpoint string
 	sourcePath           string
 	destinationPath      string
+	emailAddress	     string
 	name                 string
 }
 
 // New creates a new BearerTokenMiddleware instance.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	if config.VerificationEndpoint == "" {
-		return nil, fmt.Errorf("verificationEndpoint is required")
-	}
-
 	return &BearerTokenMiddleware{
 		next:                 next,
 		verificationEndpoint: config.VerificationEndpoint,
 		sourcePath:           config.SourcePath,
 		destinationPath:      config.DestinationPath,
+		emailAddress:         config.EmailAddress,
 		name:                 name,
 	}, nil
 }
 
 // ServeHTTP processes the HTTP request.
 func (b *BearerTokenMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	// Extract the token from the "auth_token" cookie.
-	cookie, err := req.Cookie("auth_token")
-	if err != nil {
-		http.Error(rw, "missing or invalid auth_token cookie", http.StatusUnauthorized)
-		return
-	}
-	
-	// Verify the token and get the email.
-	email, err := b.verifyTokenAndGetEmail(cookie.Value)
-	if err != nil {
-		http.Error(rw, "unauthorized: "+err.Error(), http.StatusUnauthorized)
-		return
+	// Log all cookies in the request.
+	for _, cookie := range req.Cookies() {
+		log.Printf("Cookie: %s = %s", cookie.Name, cookie.Value)
 	}
 
-	// Inject the email as a header into the request.
-	req.Header.Set("X-Authentik-Email", email)
+	req.Header.Set("X-authentik-email", b.emailAddress)
 
 	// Replace the request path if it matches the source path.
 	if strings.HasPrefix(req.URL.Path, b.sourcePath) {
@@ -78,37 +69,4 @@ func (b *BearerTokenMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Requ
 
 	// Pass the request to the next handler.
 	b.next.ServeHTTP(rw, req)
-}
-
-// verifyTokenAndGetEmail calls the external endpoint to validate the token and retrieve the email.
-func (b *BearerTokenMiddleware) verifyTokenAndGetEmail(token string) (string, error) {
-	payload, err := json.Marshal(map[string]string{"token": token})
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal token: %w", err)
-	}
-
-	resp, err := http.Post(b.verificationEndpoint, "application/json", bytes.NewBuffer(payload))
-	if err != nil {
-		return "", fmt.Errorf("verification request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("verification failed: %s", string(body))
-	}
-
-	// Parse the response body to extract the email.
-	var responseData struct {
-		Email string `json:"email"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if responseData.Email == "" {
-		return "", fmt.Errorf("email not found in verification response")
-	}
-
-	return responseData.Email, nil
 }
