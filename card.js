@@ -37,18 +37,23 @@ class AuthWebpageCard extends LitElement {
     setIframeCookie(iframeUrl) {
         try {
             const url = new URL(iframeUrl);
-            const iframeDomain = url.hostname;
+            const hostnameParts = url.hostname.split('.');
+
+            // Drop the first label if there are more than two parts
+            const iframeDomain =
+                hostnameParts.length > 2 ? hostnameParts.slice(1).join('.') : url.hostname;
 
             const cookieName = "test_cookie";
             const cookieValue = "test_value";
             const expires = new Date(Date.now() + 3600 * 1000).toUTCString(); // 1 hour from now
 
-            document.cookie = `${cookieName}=${cookieValue}; path=/; domain=${iframeDomain}; expires=${expires}; Secure; SameSite=None`;
+            document.cookie = `${cookieName}=${cookieValue}; path=/; domain=.${iframeDomain}; expires=${expires}; Secure; SameSite=None`;
             console.log(`Cookie set for iframe domain: ${iframeDomain}`);
         } catch (error) {
             console.error("Error setting iframe cookie:", error);
         }
     }
+
 
     render() {
         return html`
