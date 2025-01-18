@@ -1,9 +1,0 @@
-{
-    "domain": "auth_verify",
-    "name": "Home Assistant Auth Verify",
-    "version": "1.0",
-    "dependencies": [],
-    "codeowners": ["@tritonNET"],
-    "requirements": ["aiohttp"],
-    "documentation": "https://www.tritonnet.nz"
-}
