@@ -35,15 +35,44 @@ class AuthWebpageCard extends LitElement {
 
     setIframeCookie() {
         try {
-            const cookieName = "test_cookie";
-            const cookieValue = "test_value";
-            const expires = new Date(Date.now() + 3600 * 1000).toUTCString();
+            const hassToken = localStorage.getItem('hassTokens');
+            if (hassToken == null) {
+                console.error("No hass token found in local storage");
+                return;
+            }
 
-            document.cookie = `${cookieName}=${cookieValue}; path=/; domain=.${location.hostname}; expires=${expires}; Secure; SameSite=None`;
+            const hassTokenJson = JSON.parse(hassToken);
+
+            const accessToken = hassTokenJson.access_token;
+            if (!accessToken) {
+                console.error("No access token found in hass token");
+                return;
+            }
+
+            const expiresIn = hassTokenJson.expires_in; // Token expiration in seconds
+            if (!expiresIn) {
+                console.error("No expiration time found in hass token");
+                return;
+            }
+
+            // Calculate the expiration time in milliseconds
+            const expiresInMs = expiresIn * 1000; // Convert seconds to milliseconds
+            const expiresAt = new Date(Date.now() + expiresInMs).toUTCString();
+
+            // Set the cookie
+            document.cookie = `haatc=${accessToken}; path=/; domain=.${location.hostname}; expires=${expiresAt}; Secure; SameSite=None`;
+            console.log(`Cookie set with expiration at ${expiresAt}`);
+
+            // Schedule the cookie refresh based on the expires_in value
+            setTimeout(() => {
+                console.log("Refreshing cookie...");
+                this.setIframeCookie(); // Re-read the latest token from localStorage
+            }, expiresInMs - 500); // Refresh 500ms before it expires for safety
         } catch (error) {
             console.error("Error setting iframe cookie:", error);
         }
     }
+
     
     render() {
         return html`
