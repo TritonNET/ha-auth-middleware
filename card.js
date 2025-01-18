@@ -29,32 +29,22 @@ class AuthWebpageCard extends LitElement {
                     break;
             }
         }
-
-        // Set a test cookie
-        this.setIframeCookie(this.url);
+        
+        this.setIframeCookie();
     }
 
-    setIframeCookie(iframeUrl) {
+    setIframeCookie() {
         try {
-            const url = new URL(iframeUrl);
-            const hostnameParts = url.hostname.split('.');
-
-            // Drop the first label if there are more than two parts
-            const iframeDomain =
-                hostnameParts.length > 2 ? hostnameParts.slice(1).join('.') : url.hostname;
-
             const cookieName = "test_cookie";
             const cookieValue = "test_value";
-            const expires = new Date(Date.now() + 3600 * 1000).toUTCString(); // 1 hour from now
+            const expires = new Date(Date.now() + 3600 * 1000).toUTCString();
 
-            document.cookie = `${cookieName}=${cookieValue}; path=/; domain=.${iframeDomain}; expires=${expires}; Secure; SameSite=None`;
-            console.log(`Cookie set for iframe domain: ${iframeDomain}`);
+            document.cookie = `${cookieName}=${cookieValue}; path=/; domain=.${location.hostname}; expires=${expires}; Secure; SameSite=None`;
         } catch (error) {
             console.error("Error setting iframe cookie:", error);
         }
     }
-
-
+    
     render() {
         return html`
               <iframe class="chart-frame" src="${this.url}"></iframe>
