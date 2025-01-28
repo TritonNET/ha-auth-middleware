@@ -1,8 +1,7 @@
-# Authentication Component Overview
+﻿# Authentication Component Overview
 
-<div style="background-color: #ffcccc; color: #990000; padding: 10px; border: 1px solid #990000; border-radius: 5px; text-align: center; font-weight: bold; margin-bottom: 20px;">
-WARNING: This project is still in development and not yet ready for production use.
-</div>
+> ⚠️ **WARNING:** This project is still in development and not yet ready for production use.
+
 
 This authentication system is designed to integrate with Home Assistant and Traefik, leveraging Home Assistant's access token to authenticate users. It consists of three main sub-components:
 
