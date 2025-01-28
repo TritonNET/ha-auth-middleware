@@ -1,4 +1,4 @@
-module github.com/TritonNET/traefik-ha-auth-middleware
+module github.com/TritonNET/ha-auth-middleware
 
 go 1.19
 

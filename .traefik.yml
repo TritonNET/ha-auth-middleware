@@ -1,11 +1,7 @@
 displayName: Home Assistant Authentication Middleware
 type: middleware
-import: github.com/TritonNET/traefik-ha-auth-middleware
+import: github.com/TritonNET/ha-auth-middleware
 summary: Home Assistant Authentication Middleware
-
-# Medias associated to the plugin (optional)
-#iconPath: foo/icon.png
-#bannerPath: foo/banner.png
 
 # Configuration data for your plugin.
 # This is mandatory,
